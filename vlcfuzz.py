@@ -14,7 +14,8 @@ methods = ['OPTIONS', 'DESCRIBE', 'SETUP', 'PLAY', 'GET_PARAMETER',
 log_file = 'vlcfuzz.log'
 user_agent_str = 'User-Agent: VLC media player (LIVE555 Streaming Media v2010.02.10)'
 protocol_str = 'AVP;unicast;client_port=36142-36143'
-
+session_str = '98q2y3bkkjhgier2'
+mutate_scale_factor = .1
 
 def flesh_out_data(data_tuple, method, size):
     lst = list(data_tuple)
@@ -74,7 +75,7 @@ def structured_fuzz(min, max, step, target, path, data):
 def random_fuzz():
     pass
 
-def do_randomized_fuzz(options):
+def do_randomized_fuzz(options, mutator_func):
     structured_formats = [
     (None, options.target, options.file, None, ' RTSP/1.0', CRLF, 'CSeq: 1',
         CRLF, user_agent_str, CRLF+'\n'),
@@ -95,7 +96,14 @@ def do_randomized_fuzz(options):
       'Transport: RTP/', None, ';'+protocol_str+CRLF+user_agent_str+CRLF+'\n'),
 
     (None, options.target, options.file, ' RTSP/1.0', CRLF, 'CSeq: 3',CRLF,
-      'Transport: RTP/AVP',None,';'+protocol_str+CRLF+user_agent_str+CRLF+'\n')]
+      'Transport: RTP/AVP',None,';'+protocol_str+CRLF+user_agent_str+CRLF+'\n'),
+
+    (None, options.target, options.file, ' RTSP/1.0', CRLF, 'CSeq: 6', CRLF,
+        'Session: ', None, CRLF+user_agent_str+CRLF+'\n'),
+
+    (None, options.target, options.file, ' RTSP/1.0', CRLF, 'CSeq: 7', CRLF,
+        'Session: '+session_str+CRLF+'Range: npt=', None,
+        CRLF+user_agent_str+CRLF+'\n')]
 
     logger.info('Starting Junk Fuzz')
     junk_fuzz_output = junk_fuzz(options.min, options.max, options.step)
@@ -106,8 +114,38 @@ def do_randomized_fuzz(options):
         logger.info('Starting Structured Fuzz Seq %s' % str(s))
         structured_fuzz_output = structured_fuzz(options.min, options.max,
                 options.step, options.target, options.file, format)
+        if mutator_func is not None:
+            structured_fuzz_output = mutator_func(structured_fuzz_output)
         send(structured_fuzz_output, options.target, options.port)
         s += 1
+
+# Mutators
+def random_mutate(requests):
+    mutated_requests = []
+    for request in requests:
+        request = list(request)
+        for i in xrange(int(mutate_scale_factor * len(request))):
+            request[random.randint(0,len(request)-1)] = ' '
+        request = "".join(request)
+        mutated_requests.append(request)
+    return mutated_requests
+
+def method_mutate(requests):
+    mutated_requests = []
+    for request in requests:
+        for method in methods:
+            if method in request:
+                new_method = methods[random.randint(0,len(methods)-1)]
+                request = request.replace(method, new_method)
+        mutated_requests.append(request)
+    return mutated_requests
+
+def offset_mutate(requests):
+    mutated_requests = []
+    for request in requests:
+        request = ' ' + request
+        mutated_requests.append(request)
+    return mutated_requests
 
 if __name__ == '__main__':
     # Set up script flags and options
@@ -140,16 +178,20 @@ if __name__ == '__main__':
 
     # Set up logging, both to console and to LOG_FILE
     clear_log()
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(filename=log_file, level=logging.INFO)
     logger = logging.getLogger(__name__)
-    handler = logging.FileHandler(log_file)
-    handler.setLevel(logging.INFO)
-    logger.addHandler(handler)
 
     # Fuzzing doesn't work without a remote stream file/path
     if options.file is None:
         logger.error('ERROR: Remote stream file not specified, quitting')
         sys.exit(1)
+    print 'Script running with these options:'
+    print options
+
+    mutators = [None, random_mutate, method_mutate, offset_mutate]
 
     # goto fuzzing entrypoint
-    do_randomized_fuzz(options)
+    for mutate_func in mutators:
+        do_randomized_fuzz(options, mutate_func)
+
+    print 'Done! Check out the log file'
