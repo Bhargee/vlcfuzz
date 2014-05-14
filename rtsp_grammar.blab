@@ -1,0 +1,30 @@
+Request = Request-Line SP (general-header SP| request-header SP| entity-header SP) CLRF message-body
+
+SP = 32
+CLRF = 13 10
+DIGIT = [123456789]
+
+Request-Line = Method SP Request-URI SP RTSP-Version CLRF
+
+Method         =        "DESCRIBE"             
+              |         "ANNOUNCE"              
+              |         "GET_PARAMETER"         
+              |         "OPTIONS"               
+              |         "PAUSE"                 
+              |         "PLAY"                  
+              |         "RECORD"                
+              |         "REDIRECT"              
+              |         "SETUP"                 
+              |         "SET_PARAMETER"         
+              |         "TEARDOWN"              
+
+Request-URI = "URI"
+RTSP-Version = "RTSP" "/" DIGIT "." DIGIT
+
+message-body = "BODY"
+
+request-header = "REQUEST_HEADER"
+
+entity-header = "ENTITY_HEADER"
+             
+general-header = "GENERAL_HEADER"
