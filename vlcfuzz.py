@@ -13,11 +13,13 @@ methods = ['OPTIONS', 'DESCRIBE', 'SETUP', 'PLAY', 'GET_PARAMETER',
     'TEARDOWN', 'PAUSE']
 log_file = 'vlcfuzz.log'
 user_agent_str = 'User-Agent: VLC media player (LIVE555 Streaming Media v2010.02.10)'
+protocol_str = 'AVP;unicast;client_port=36142-36143'
 
-def add_method_to_data(data_tuple, method):
+
+def flesh_out_data(data_tuple, method, size):
     lst = list(data_tuple)
     lst[0] = method
-    return tuple(lst)
+    return tuple([gen_data(size) if e is None else e for e in lst])
 
 def clear_log():
     with open(log_file, 'w') as f:
@@ -35,15 +37,16 @@ def send(data, ip, port):
         if s:
             s.close()
         logger.error('Could not connect to target\n %s' % msg, exc_info=True)
-        sys.exit(1)
+#        sys.exit(1)
 
     for packet in data:
         logger.info('Sending %s' % packet)
+        r = None
         try:
             s.send(packet)
+            r = s.recv(1024)
         except:
-            logger.error('Could not send packet %s' % packet)
-        r = s.recv(1024)
+            logger.error('Could not send packet:\n%s' % packet)
         logger.info('Recieved %s' % r)
     s.close()
 
@@ -62,7 +65,8 @@ def structured_fuzz(min, max, step, target, path, data):
     requests = []
     for method in methods:
         for i in xrange(max/step):
-            req = '%s rtsp://%s/%s%s%s%s%s%s%s%s' % add_method_to_data(data,method)
+            req = '%s rtsp://%s/%s%s%s%s%s%s%s%s' % flesh_out_data(data,method,
+                                                                    size)
             requests.append(req)
             size += step
     return requests
@@ -70,29 +74,40 @@ def structured_fuzz(min, max, step, target, path, data):
 def random_fuzz():
     pass
 
-def do_fuzz(options):
-    structured_formats = []
-    structured_formats[0] = (None, options.target, options.file, None,
-            ' RTSP/1.0', CRLF, 'CSeq: 1', CRLF, user_agent_str, CRLF+'\n')
-    structured_formats[1] = (None, options.target, options.file, ' RTSP/1.0',
-            CRLF, 'CSeq: 1', CRLF, user_agent_str, None, CRLF+'\n')
-    structured_formats[2] = (None, options.target, options.file, ' RTSP/1.0',
-            CRLF, 'CSeq: ', None, CRLF, user_agent_str, CRLF+'\n')
-    structured_formats[3] = (None, options.target, options.file, ' RTSP/1.0',
-            CRLF, 'CSeq: 2', CRLF, 'Accept: application/sdp', None, CRLF,
-            user_agent_str+CRLF+'\n')
+def do_randomized_fuzz(options):
+    structured_formats = [
+    (None, options.target, options.file, None, ' RTSP/1.0', CRLF, 'CSeq: 1',
+        CRLF, user_agent_str, CRLF+'\n'),
 
+    (None, options.target, options.file, ' RTSP/1.0', CRLF, 'CSeq: 1', CRLF,
+        user_agent_str, None, CRLF+'\n'),
+
+    (None, options.target, options.file, ' RTSP/1.0', CRLF, 'CSeq: ', None,
+        CRLF, user_agent_str, CRLF+'\n'),
+
+    (None, options.target, options.file, ' RTSP/1.0', CRLF, 'CSeq: 2', CRLF,
+        'Accept: application/sdp', None, CRLF+user_agent_str+CRLF+'\n'),
+
+    (None, options.target, options.file, ' RTSP/1.0', CRLF, 'CSeq: 3', CRLF,
+        'Transport: ', None, '/'+ protocol_str+CRLF+user_agent_str+CRLF+'\n'),
+
+    (None, options.target, options.file, ' RTSP/1.0', CRLF, 'CSeq: 3', CRLF,
+      'Transport: RTP/', None, ';'+protocol_str+CRLF+user_agent_str+CRLF+'\n'),
+
+    (None, options.target, options.file, ' RTSP/1.0', CRLF, 'CSeq: 3',CRLF,
+      'Transport: RTP/AVP',None,';'+protocol_str+CRLF+user_agent_str+CRLF+'\n')]
 
     logger.info('Starting Junk Fuzz')
     junk_fuzz_output = junk_fuzz(options.min, options.max, options.step)
-    #send(junk_fuzz_output, options.target, options.port)
+    send(junk_fuzz_output, options.target, options.port)
 
-    for s in len(structured_formats):
+    s = 0
+    for format in structured_formats:
         logger.info('Starting Structured Fuzz Seq %s' % str(s))
         structured_fuzz_output = structured_fuzz(options.min, options.max,
-                options.step, options.target, options.file,
-                structured_formats[s])
-        #send(structured_fuzz_output, options.target, options.port)
+                options.step, options.target, options.file, format)
+        send(structured_fuzz_output, options.target, options.port)
+        s += 1
 
 if __name__ == '__main__':
     # Set up script flags and options
@@ -137,4 +152,4 @@ if __name__ == '__main__':
         sys.exit(1)
 
     # goto fuzzing entrypoint
-    do_fuzz(options)
+    do_randomized_fuzz(options)
