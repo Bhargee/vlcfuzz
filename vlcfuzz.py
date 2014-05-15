@@ -199,8 +199,8 @@ def do_grammar_fuzz(options, mutator_func, num):
         requests.append(request)
     # Mutate the requests if a mutator function is given
     if mutator_func is not None:
-        grammar_fuzz_output = mutator_func(requests)
-    send(grammar_fuzz_output, options.target, options.port)
+        requests = mutator_func(requests)
+    send(requests, options.target, options.port)
 
 # #####Mutators
 # These functions change requests in ways that historically have lead to
