@@ -1,4 +1,4 @@
-Request = Request-Line SP request-header SP CLRF message-body
+Request = Request-Line SP CLRF message-body
 
 SP = 32
 CLRF = 13 10
@@ -20,5 +20,3 @@ Request-URI = "URI"
 RTSP-Version = "RTSP" "/" "1.0"
 
 message-body = "BODY"
-
-request-header = "REQUEST_HEADER"

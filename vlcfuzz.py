@@ -100,7 +100,7 @@ def do_randomized_fuzz(options, mutator_func):
     # random string
     structured_formats = [
     # Normal, though minimal, format
-    (None, options.target, options.file, None, ' RTSP/1.0', CRLF, 'CSeq: 1',
+    (None, options.target, options.file+' ', None, ' RTSP/1.0', CRLF, 'CSeq: 1',
         CRLF, user_agent_str, CRLF+'\n'),
 
     # Another normal and minimal format with the order of data and user agent
@@ -180,7 +180,7 @@ def do_grammar_fuzz(options, mutator_func, num):
         request = request.replace('URI', 'rtsp://%s/%s' % (options.target,
                                 options.file))
         # Add a sequence number, which increases by one for every request
-        body = 'CSeq: %s%s' % (str(i+1), CRLF)
+	body = 'CSeq: %s%s' % (str(i+1), CRLF)
         setup_sent = setup_sent or 'SETUP' in request
         # Continue if a PLAY is seen before a setup
         if not setup_sent and 'PLAY' in request:
@@ -263,6 +263,9 @@ if __name__ == '__main__':
             help='Step size between min and max',
             default=20)
 
+    parser.add_option('-g', '--grammar', dest='grammar', action='store_true',
+            default=False)
+
     # The only required command line parameter is the path to the streaming file
     # on the target
     parser.add_option('-f', '--file', dest='file',
@@ -287,13 +290,14 @@ if __name__ == '__main__':
     # We'll set up an array such that each fuzzing method is run with no
     # mutation random mutation, method switching, and offset addition
     mutators = [None, random_mutate, method_mutate, offset_mutate]
-
     for mutate_func in mutators:
         logger.info('Doing randomized fuzzing with mutator:%s' % mutate_func)
         do_randomized_fuzz(options, mutate_func)
-    for mutate_func in mutators:
-        logger.info('Doing grammar fuzzing with mutator:%s' % mutate_func)
-        do_grammar_fuzz(options, mutate_func, 0)
+
+    if options.grammar:
+        for mutate_func in mutators:
+            logger.info('Doing grammar fuzzing with mutator:%s' % mutate_func)
+            do_grammar_fuzz(options, mutate_func, 1)
 
     # ####And we're done!
     print 'Done! Check out the log file'
