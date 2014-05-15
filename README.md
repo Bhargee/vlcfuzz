@@ -29,6 +29,11 @@ Of all these options, only the file is required. Example usage:
 
 `python vlcfuzz.py -p 552 --min 10`
 
+If you want to use the grammar fuzzing feature, use `-g` or `--grammar`. **Be warned**, this attempt almost always succeeds in screwing up VLC, so the script might hang. Watch the logs to see if this happens when running with the grammar flag set.
+
+##Testing
+I used an Ubuntu machine with the latest version of VLC. I set up an RTSP stream via the stream dialogue on many ports (default is 8554) and paths, then ran the script. With the grammar flag set, the stream always crashes.
+
 ##Methodology
 My approach to fuzzing was nothing too fancy. First vlcfuzz tries junk requests, which VLC safely rejects, for the most part. Then vlcfuzz uses RTSP corner cases to generate valid requests, which succeeded in crashing VLC many times. Then vlcfuzz interfaces with the [Blab](https://code.google.com/p/ouspg/wiki/Blab) tool to create valid requests from the EBNF grammar for RTSP requests given in the [RTSP RFC](http://www.ietf.org/rfc/rfc2326.txt). These, sent in the right order, were the best at screwing VLC up. After sending valid requests, this process is repeated but with requests mutated according to historically effective methods (ie, methods that have tripped up VLC in the past). This includes random spacing and switching of method headers. However, VLC was surprisingly good at rejecting bad sequences/requests (with a  405 return code). Most sequences of fuzzer output result in either a reject or accept (OK, code 200). Every so often a sequence in the right order would cause the stream to stop, skip, record, or even crash VLC
 
