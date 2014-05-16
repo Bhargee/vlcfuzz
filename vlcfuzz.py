@@ -56,7 +56,7 @@ def send(data, ip, port):
             s.send(packet)
             r = s.recv(1024)
         except:
-            logger.error('Could not send packet:\n%s' % packet)
+            logger.error('Request rejected:\n%s' % packet)
         logger.info('Recieved %s' % r)
     s.close()
 
